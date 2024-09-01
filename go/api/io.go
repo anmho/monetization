@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -6,10 +6,6 @@ import (
 	"io"
 	"net/http"
 )
-
-type PaymentParams struct {
-	AmountUSD int64 `json:"amount_usd" validate:"numeric"`
-}
 
 func JSON[T any](w http.ResponseWriter, status int, data T) {
 	w.WriteHeader(status)

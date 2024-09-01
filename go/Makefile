@@ -9,4 +9,8 @@ run: build
 
 .PHONY: build
 build:
-	@go build -o ./bin/api .
+	@go build -o ./bin/api ./cmd/api/main.go
+
+.PHONY: watch
+watch: build
+	@air --build.cmd "make build" --build.bin "./bin/api"
