@@ -12,7 +12,8 @@ import (
 )
 
 type Config struct {
-	StripeKey string `env:"STRIPE_KEY"`
+	StripeKey           string `env:"STRIPE_KEY"`
+	StripeWebhookSecret string `env:"STRIPE_WEBHOOK_SECRET"`
 }
 
 func init() {
@@ -32,7 +33,7 @@ func main() {
 	fmt.Printf("config: %+v\n", config)
 
 	stripe.Key = config.StripeKey
-	mux := api.MakeServer()
+	mux := api.MakeServer(config.StripeWebhookSecret)
 
 	srv := http.Server{
 		Addr:    ":8080",

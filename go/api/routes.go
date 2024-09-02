@@ -5,10 +5,11 @@ import (
 	"net/http"
 )
 
-func registerRoutes(mux *http.ServeMux) {
+func registerRoutes(mux *http.ServeMux, stripeWebhookSecret string) {
 	mux.HandleFunc("POST /payments", cors(handleCreatePaymentIntent))
 	mux.HandleFunc("POST /subscriptions", cors(handleSubscriptions))
 	mux.HandleFunc("POST /checkout-session", cors(handleCheckoutSession))
+	mux.HandleFunc("POST /webhook", handleWebhook(stripeWebhookSecret))
 	mux.HandleFunc("GET /health", cors(handleHealthCheck))
 }
 

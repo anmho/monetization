@@ -1,15 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/stripe/stripe-go/v79"
 	"github.com/stripe/stripe-go/v79/checkout/session"
 	"github.com/stripe/stripe-go/v79/paymentintent"
 	"github.com/stripe/stripe-go/v79/product"
 	"github.com/stripe/stripe-go/v79/subscription"
+	"github.com/stripe/stripe-go/v79/webhook"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 )
 
 type PaymentParams struct {
@@ -56,9 +60,9 @@ type CheckoutParams struct {
 	Items      []CheckoutItem `json:"items" validate:"required,dive"`
 }
 
-func MakeServer() http.Handler {
+func MakeServer(stripeWebhookSecret string) http.Handler {
 	mux := http.NewServeMux()
-	registerRoutes(mux)
+	registerRoutes(mux, stripeWebhookSecret)
 	return mux
 }
 
@@ -176,6 +180,67 @@ func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleWebhook(w http.ResponseWriter, r *http.Request) {
+func handleWebhook(stripeWebhookSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			slog.Error("reading body")
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+
+		event, err := webhook.ConstructEvent(b, r.Header.Get("Stripe-Signature"), stripeWebhookSecret)
+		if err != nil {
+			slog.Error("constructing event", slog.Any("err", err))
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		slog.Info("handling webhook", slog.Any("eventType", event.Type))
+
+		switch event.Type {
+		case stripe.EventTypeCheckoutSessionCompleted, stripe.EventTypeCheckoutSessionAsyncPaymentSucceeded:
+			var cs stripe.CheckoutSession
+			err := json.Unmarshal(event.Data.Raw, &cs)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error parsing webhook JSON: %v\n", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			slog.Info("handling webhook request", slog.Any("checkoutSession", cs))
+			err = FulfillCheckout(cs.ID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		}
+	}
+}
+
+func FulfillCheckout(sessionID string) error {
+	// TODO: Make this function safe to run multiple times,
+	// even concurrently, with the same session ID
+
+	// TODO: Make sure fulfillment hasn't already been
+	// peformed for this Checkout Session
+	params := &stripe.CheckoutSessionParams{}
+	params.AddExpand("line_items")
+
+	cs, err := session.Get(sessionID, params)
+	if err != nil {
+		return err
+	}
+
+	// Check the Checkout Session's payment_status property
+	// to determine if fulfillment should be performed
+	if cs.PaymentStatus != stripe.CheckoutSessionPaymentStatusUnpaid {
+		// TODO: Perform fulfillment of the line items
+
+		// TODO: Record/save fulfillment status for this
+		// Checkout Session
+
+		slog.Info("fulfilling successful checkout", slog.Any("checkoutSessionID", cs.ID))
+	}
+	return nil
 }
