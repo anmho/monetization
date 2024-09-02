@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/stripe/stripe-go/v79"
+	"github.com/stripe/stripe-go/v79/checkout/session"
 	"github.com/stripe/stripe-go/v79/paymentintent"
 	"github.com/stripe/stripe-go/v79/product"
 	"github.com/stripe/stripe-go/v79/subscription"
@@ -45,11 +46,19 @@ type SubscriptionParams struct {
 	PaymentMethodID       string `json:"payment_method_id" validate:"required"`
 }
 
+type CheckoutItem struct {
+	ProductID string `json:"product_id" validate:"required"`
+	Quantity  int64  `json:"quantity" validate:"required"`
+}
+
+type CheckoutParams struct {
+	CustomerID string         `json:"customer_id" validate:"required"`
+	Items      []CheckoutItem `json:"items" validate:"required,dive"`
+}
+
 func MakeServer() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /payments", handlePayments)
-
-	mux.HandleFunc("POST /subscriptions", handleSubscriptions)
+	registerRoutes(mux)
 	return mux
 }
 
@@ -134,5 +143,49 @@ func handleSubscriptions(w http.ResponseWriter, r *http.Request) {
 
 // handleCheckoutSession handles checking out a user when we want to use Stripe's pre-built payments page
 func handleCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	params, err := ReadParams[CheckoutParams](r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	var lineItems []*stripe.CheckoutSessionLineItemParams
+	//lineItems := make([]*stripe.CheckoutSessionLineItemParams, len(params.Items))
+	for _, item := range params.Items {
+		prod, err := product.Get(item.ProductID, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		slog.Info("item", slog.Any("item", item))
+		lineItems = append(lineItems, &stripe.CheckoutSessionLineItemParams{
+			Price:    stripe.String(prod.DefaultPrice.ID),
+			Quantity: stripe.Int64(item.Quantity),
+		})
+	}
+	slog.Info("creating checkout session", slog.Any("lineItems", lineItems[0]))
+
+	checkoutParams := &stripe.CheckoutSessionParams{
+		SuccessURL: stripe.String("https://youtube.com"),
+		Customer:   stripe.String(params.CustomerID),
+		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		LineItems:  lineItems,
+	}
+
+	checkoutSession, err := session.New(checkoutParams)
+	if err != nil {
+		JSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	JSON(w, http.StatusCreated, map[string]any{
+		"checkout_url": checkoutSession.URL,
+	})
+}
+
+func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	JSON(w, http.StatusOK, map[string]any{
+		"message": "hello",
+	})
 }
