@@ -6,7 +6,7 @@ import (
 )
 
 func registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /payments", cors(handlePayments))
+	mux.HandleFunc("POST /payments", cors(handleCreatePaymentIntent))
 	mux.HandleFunc("POST /subscriptions", cors(handleSubscriptions))
 	mux.HandleFunc("POST /checkout-session", cors(handleCheckoutSession))
 	mux.HandleFunc("GET /health", cors(handleHealthCheck))

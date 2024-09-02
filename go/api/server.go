@@ -62,15 +62,13 @@ func MakeServer() http.Handler {
 	return mux
 }
 
-// handlePayments handles creating a payment for a custom payment flow.
-func handlePayments(w http.ResponseWriter, r *http.Request) {
+// handleCreatePaymentIntent handles creating a payment for a custom payment flow.
+func handleCreatePaymentIntent(w http.ResponseWriter, r *http.Request) {
 	params, err := ReadParams[PaymentParams](r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	fmt.Printf("%+v", params)
 
 	intentParams := &stripe.PaymentIntentParams{
 		Amount:        stripe.Int64(params.AmountUSD),
@@ -87,20 +85,8 @@ func handlePayments(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("payment created", slog.Any("payment", payment))
 	resp := map[string]any{
-		"message": "success",
+		"client_secret": payment.ClientSecret,
 	}
-
-	confirm, err := paymentintent.Confirm(payment.ID, &stripe.PaymentIntentConfirmParams{
-		PaymentMethod: stripe.String(params.PaymentMethodID),
-		ReceiptEmail:  stripe.String("andyminhtuanho@gmail.com"),
-		ReturnURL:     stripe.String("https://youtube.com"),
-		UseStripeSDK:  stripe.Bool(true),
-	})
-	if err != nil {
-		JSON(w, http.StatusInternalServerError, err)
-		return
-	}
-	fmt.Println(confirm)
 	JSON(w, http.StatusCreated, resp)
 }
 
@@ -166,7 +152,7 @@ func handleCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	slog.Info("creating checkout session", slog.Any("lineItems", lineItems[0]))
 
 	checkoutParams := &stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String("https://youtube.com"),
+		SuccessURL: stripe.String("http://localhost:3000/payments/success"),
 		Customer:   stripe.String(params.CustomerID),
 		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
 		LineItems:  lineItems,
@@ -188,4 +174,8 @@ func handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, map[string]any{
 		"message": "hello",
 	})
+}
+
+func handleWebhook(w http.ResponseWriter, r *http.Request) {
+
 }
