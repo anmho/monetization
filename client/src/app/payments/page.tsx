@@ -5,7 +5,7 @@ export default function PaymentsPage() {
     <div>
       <h1>Payments Page</h1>
       <Link href="/payments/custom">Custom Payments Page</Link>
-      <Link href="/payments/strip">Stripe Payments Page</Link>
+      <Link href="/payments/stripe">Stripe Payments Page</Link>
     </div>
   );
 }

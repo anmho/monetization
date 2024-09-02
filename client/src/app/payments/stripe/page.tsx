@@ -1,9 +1,8 @@
 'use client';
-import axios from 'axios';
 
 import { useRouter } from 'next/navigation';
 import React, { useState, useEffect } from 'react';
-
+// Redirects to Stripe hosted page
 const ProductDisplay = () => {
   const router = useRouter();
   return (
@@ -18,7 +17,6 @@ const ProductDisplay = () => {
           <h5>$20.00</h5>
         </div>
       </div>
-      {/* <form action="/create-checkout-session" method="POST"> */}
 
       <button
         type="submit"
@@ -48,7 +46,6 @@ const ProductDisplay = () => {
       >
         Checkout
       </button>
-      {/* </form> */}
     </section>
   );
 };
