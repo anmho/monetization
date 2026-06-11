@@ -50,7 +50,7 @@ const ProductDisplay = () => {
   );
 };
 
-const Message = ({ message }) => (
+const Message = ({ message }: { message: string }) => (
   <section>
     <p>{message}</p>
   </section>
